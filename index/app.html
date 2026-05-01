@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Bybit P2P Scanner</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  :root {
+    --bg: #0f0f13;
+    --bg2: #1a1a22;
+    --bg3: #22222e;
+    --accent: #f7a600;
+    --accent2: #ff6b35;
+    --green: #00d68f;
+    --red: #ff4757;
+    --text: #ffffff;
+    --text2: #9999bb;
+    --text3: #555577;
+    --border: rgba(255,255,255,0.07);
+    --radius: 16px;
+    --radius-sm: 10px;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+    min-height: 100vh;
+    padding: 0 0 80px;
+    overflow-x: hidden;
+  }
+
+  /* HEADER */
+  .header {
+    padding: 20px 20px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .logo-icon {
+    width: 38px; height: 38px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .logo-text { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
+  .logo-sub { font-size: 11px; color: var(--text2); margin-top: 1px; }
+
+  .status-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--text3);
+    transition: background 0.3s;
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.05);
+  }
+  .status-dot.active {
+    background: var(--green);
+    box-shadow: 0 0 0 3px rgba(0,214,143,0.2), 0 0 12px rgba(0,214,143,0.5);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%,100% { box-shadow: 0 0 0 3px rgba(0,214,143,0.2), 0 0 12px rgba(0,214,143,0.5); }
+    50% { box-shadow: 0 0 0 6px rgba(0,214,143,0.1), 0 0 20px rgba(0,214,143,0.4); }
+  }
+
+  /* SECTIONS */
+  .section { padding: 20px 20px 0; }
+  .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    color: var(--text3);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  /* MAIN TOGGLE */
+  .main-btn {
+    width: 100%;
+    height: 58px;
+    border-radius: var(--radius);
+    border: none;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    position: relative;
+    overflow: hidden;
+  }
+  .main-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(255,255,255,0);
+    transition: background 0.15s;
+  }
+  .main-btn:active::after { background: rgba(255,255,255,0.1); }
+  .main-btn.start {
+    background: linear-gradient(135deg, #00d68f, #00b87a);
+    color: #003d28;
+  }
+  .main-btn.stop {
+    background: linear-gradient(135deg, #ff4757, #e03040);
+    color: #fff;
+  }
+  .btn-icon { font-size: 20px; }
+
+  /* AMOUNT INPUT */
+  .amount-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .amount-icon {
+    width: 40px; height: 40px;
+    background: rgba(247,166,0,0.12);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .amount-info { flex: 1; min-width: 0; }
+  .amount-label { font-size: 12px; color: var(--text2); margin-bottom: 4px; }
+  .amount-input {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-size: 22px;
+    font-weight: 700;
+    width: 100%;
+    letter-spacing: -0.5px;
+  }
+  .amount-input::placeholder { color: var(--text3); }
+  .amount-currency {
+    font-size: 13px;
+    color: var(--accent);
+    font-weight: 600;
+    background: rgba(247,166,0,0.1);
+    padding: 4px 10px;
+    border-radius: 8px;
+  }
+
+  /* TOGGLE ROWS */
+  .toggle-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    padding: 14px 16px;
+    gap: 12px;
+    cursor: pointer;
+    transition: background 0.15s;
+    border-bottom: 1px solid var(--border);
+  }
+  .toggle-row:last-child { border-bottom: none; }
+  .toggle-row:active { background: rgba(255,255,255,0.04); }
+
+  .toggle-icon {
+    width: 36px; height: 36px;
+    border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .icon-purple { background: rgba(120,80,255,0.15); }
+  .icon-blue   { background: rgba(55,138,221,0.15); }
+  .icon-red    { background: rgba(255,71,87,0.15); }
+  .icon-amber  { background: rgba(247,166,0,0.15); }
+
+  .toggle-text { flex: 1; min-width: 0; }
+  .toggle-title { font-size: 15px; font-weight: 500; }
+  .toggle-desc  { font-size: 12px; color: var(--text2); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* SWITCH */
+  .switch {
+    width: 44px; height: 26px;
+    background: var(--bg3);
+    border-radius: 13px;
+    position: relative;
+    transition: background 0.25s;
+    flex-shrink: 0;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .switch.on { background: var(--green); border-color: transparent; }
+  .switch::after {
+    content: '';
+    position: absolute;
+    width: 20px; height: 20px;
+    background: #fff;
+    border-radius: 50%;
+    top: 2px; left: 2px;
+    transition: transform 0.25s cubic-bezier(.4,0,.2,1);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  }
+  .switch.on::after { transform: translateX(18px); }
+
+  /* MODE SELECTOR */
+  .mode-selector {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .mode-btn {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+  }
+  .mode-btn.active {
+    background: rgba(247,166,0,0.12);
+    border-color: rgba(247,166,0,0.4);
+  }
+  .mode-btn-icon { font-size: 22px; margin-bottom: 6px; }
+  .mode-btn-title { font-size: 13px; font-weight: 600; color: var(--text); }
+  .mode-btn-desc { font-size: 11px; color: var(--text2); margin-top: 3px; }
+  .mode-btn.active .mode-btn-title { color: var(--accent); }
+
+  /* STATS */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .stat-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px;
+  }
+  .stat-label { font-size: 11px; color: var(--text2); margin-bottom: 6px; }
+  .stat-value { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+  .stat-value.green { color: var(--green); }
+  .stat-value.amber { color: var(--accent); }
+
+  /* LOG */
+  .log-wrap {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .log-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .log-header-title { font-size: 13px; font-weight: 600; color: var(--text2); }
+  .log-clear { font-size: 12px; color: var(--text3); cursor: pointer; }
+  .log-clear:active { color: var(--red); }
+  .log-body { max-height: 200px; overflow-y: auto; }
+  .log-entry {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    animation: slideIn 0.25s ease;
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .log-entry:last-child { border-bottom: none; }
+  .log-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    margin-top: 5px;
+    flex-shrink: 0;
+  }
+  .log-dot.found { background: var(--green); }
+  .log-dot.info  { background: var(--text3); }
+  .log-text { font-size: 13px; color: var(--text2); line-height: 1.4; }
+  .log-time { font-size: 11px; color: var(--text3); margin-top: 2px; }
+  .log-empty {
+    padding: 30px;
+    text-align: center;
+    color: var(--text3);
+    font-size: 13px;
+  }
+
+  /* SAVE BTN */
+  .save-btn {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    padding: 12px 20px;
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+  }
+  .save-btn button {
+    width: 100%;
+    height: 52px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border: none;
+    border-radius: var(--radius-sm);
+    color: #1a0a00;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .save-btn button:active { opacity: 0.85; }
+
+  /* TOAST */
+  .toast {
+    position: fixed;
+    top: 20px; left: 50%;
+    transform: translateX(-50%) translateY(-80px);
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 20px;
+    border-radius: 30px;
+    font-size: 14px;
+    font-weight: 500;
+    transition: transform 0.3s cubic-bezier(.4,0,.2,1);
+    z-index: 999;
+    white-space: nowrap;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  .gap { height: 12px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <div class="logo-icon">⚡</div>
+    <div>
+      <div class="logo-text">P2P Scanner</div>
+      <div class="logo-sub">Bybit · USDT/RUB</div>
+    </div>
+  </div>
+  <div class="status-dot" id="statusDot"></div>
+</div>
+
+<div class="section" style="margin-top:20px;">
+  <div class="section-label">Управление</div>
+  <button class="main-btn start" id="mainBtn" onclick="toggleScanner()">
+    <span class="btn-icon">▶</span>
+    <span id="mainBtnText">Запустить сканер</span>
+  </button>
+</div>
+
+<div class="section" style="margin-top:16px;">
+  <div class="section-label">Сумма для поиска</div>
+  <div class="amount-card">
+    <div class="amount-icon">💰</div>
+    <div class="amount-info">
+      <div class="amount-label">Введи сумму из описания ордера</div>
+      <input class="amount-input" type="number" id="amountInput" placeholder="2500" inputmode="numeric">
+    </div>
+    <div class="amount-currency">RUB</div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:16px;">
+  <div class="section-label">Режим поиска</div>
+  <div class="mode-selector">
+    <div class="mode-btn active" id="modeExact" onclick="setMode('exact')">
+      <div class="mode-btn-icon">🎯</div>
+      <div class="mode-btn-title">Точная сумма</div>
+      <div class="mode-btn-desc">Ищем именно эту цифру</div>
+    </div>
+    <div class="mode-btn" id="modeMax" onclick="setMode('max')">
+      <div class="mode-btn-icon">📊</div>
+      <div class="mode-btn-title">До максимума</div>
+      <div class="mode-btn-desc">Любая сумма ≤ указанной</div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:16px;">
+  <div class="section-label">Фильтры</div>
+  <div class="toggle-card">
+    <div class="toggle-row" onclick="toggle('blacklist')">
+      <div class="toggle-icon icon-red">🏦</div>
+      <div class="toggle-text">
+        <div class="toggle-title">Блок Т-банка</div>
+        <div class="toggle-desc">Скрывать ордера с Тинькофф / Т-банком</div>
+      </div>
+      <div class="switch on" id="sw-blacklist"></div>
+    </div>
+    <div class="toggle-row" onclick="toggle('priceFilter')">
+      <div class="toggle-icon icon-amber">📉</div>
+      <div class="toggle-text">
+        <div class="toggle-title">Фильтр по курсу</div>
+        <div class="toggle-desc" id="priceDesc">Скрывать ордера дороже 82 руб/USDT</div>
+      </div>
+      <div class="switch" id="sw-priceFilter"></div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:16px;">
+  <div class="section-label">Статистика сессии</div>
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Проверено ордеров</div>
+      <div class="stat-value amber" id="statChecked">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Найдено совпадений</div>
+      <div class="stat-value green" id="statFound">0</div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:16px;">
+  <div class="section-label">Лог активности</div>
+  <div class="log-wrap">
+    <div class="log-header">
+      <div class="log-header-title">Последние события</div>
+      <div class="log-clear" onclick="clearLog()">Очистить</div>
+    </div>
+    <div class="log-body" id="logBody">
+      <div class="log-empty">Запусти сканер чтобы увидеть результаты</div>
+    </div>
+  </div>
+</div>
+
+<div class="gap"></div>
+
+<div class="save-btn">
+  <button onclick="saveSettings()">Сохранить и закрыть</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const tg = window.Telegram?.WebApp;
+if (tg) { tg.expand(); tg.setHeaderColor('#0f0f13'); tg.setBackgroundColor('#0f0f13'); }
+
+let state = {
+  running: false,
+  mode: 'exact',
+  blacklist: true,
+  priceFilter: false,
+  amount: '2500',
+  checked: 0,
+  found: 0
+};
+
+function setMode(m) {
+  state.mode = m;
+  document.getElementById('modeExact').classList.toggle('active', m === 'exact');
+  document.getElementById('modeMax').classList.toggle('active', m === 'max');
+}
+
+function toggle(key) {
+  state[key] = !state[key];
+  const sw = document.getElementById('sw-' + key);
+  sw.classList.toggle('on', state[key]);
+  if (tg) tg.HapticFeedback.impactOccurred('light');
+}
+
+function toggleScanner() {
+  const amt = document.getElementById('amountInput').value.trim();
+  if (!amt || isNaN(amt)) { showToast('⚠️ Введи сумму для поиска'); return; }
+  state.amount = amt;
+  state.running = !state.running;
+
+  const btn = document.getElementById('mainBtn');
+  const dot = document.getElementById('statusDot');
+  const txt = document.getElementById('mainBtnText');
+
+  if (state.running) {
+    btn.className = 'main-btn stop';
+    btn.querySelector('.btn-icon').textContent = '⏹';
+    txt.textContent = 'Остановить сканер';
+    dot.classList.add('active');
+    addLog('Сканер запущен · сумма ' + amt + ' RUB', 'info');
+    if (tg) tg.HapticFeedback.notificationOccurred('success');
+  } else {
+    btn.className = 'main-btn start';
+    btn.querySelector('.btn-icon').textContent = '▶';
+    txt.textContent = 'Запустить сканер';
+    dot.classList.remove('active');
+    addLog('Сканер остановлен', 'info');
+    if (tg) tg.HapticFeedback.notificationOccurred('warning');
+  }
+
+  sendToBot();
+}
+
+function addLog(text, type) {
+  const body = document.getElementById('logBody');
+  const empty = body.querySelector('.log-empty');
+  if (empty) empty.remove();
+
+  const now = new Date().toLocaleTimeString('ru', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+  const el = document.createElement('div');
+  el.className = 'log-entry';
+  el.innerHTML = `<div class="log-dot ${type}"></div><div><div class="log-text">${text}</div><div class="log-time">${now}</div></div>`;
+  body.insertBefore(el, body.firstChild);
+
+  const entries = body.querySelectorAll('.log-entry');
+  if (entries.length > 20) entries[entries.length - 1].remove();
+}
+
+function clearLog() {
+  document.getElementById('logBody').innerHTML = '<div class="log-empty">Лог очищен</div>';
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function saveSettings() {
+  const amt = document.getElementById('amountInput').value.trim();
+  if (!amt || isNaN(amt)) { showToast('⚠️ Введи сумму'); return; }
+  state.amount = amt;
+
+  sendToBot();
+  showToast('✅ Настройки сохранены');
+  if (tg) {
+    tg.HapticFeedback.notificationOccurred('success');
+    setTimeout(() => tg.close(), 800);
+  }
+}
+
+function sendToBot() {
+  if (tg) {
+    tg.sendData(JSON.stringify({
+      running: state.running,
+      mode: state.mode,
+      amount: state.amount,
+      blacklist: state.blacklist,
+      priceFilter: state.priceFilter
+    }));
+  }
+}
+
+document.getElementById('amountInput').value = state.amount;
+</script>
+</body>
+</html>
