@@ -85,138 +85,105 @@ button {
 
 <script>
 const tg = window.Telegram?.WebApp;
-if (tg) tg.expand();
+if (tg) { tg.expand(); tg.setHeaderColor('#0f0f13'); tg.setBackgroundColor('#0f0f13'); }
 
-// состояние
-let state = {
-  running: false,
-  amount: "3000"
-};
-
+// ── STATE ──
+let state = { running: false, mode: 'exact', blacklist: true, priceFilter: false, amount: '2500', maxPrice: '82' };
 let orders = [];
 let statChecked = 0;
 let statFound = 0;
 
-// загрузка
-function loadState(){
-  try{
-    orders = JSON.parse(localStorage.getItem("orders") || "[]");
-
-    const stats = JSON.parse(localStorage.getItem("stats") || "{}");
-    statChecked = stats.checked || 0;
-    statFound = stats.found || 0;
-  }catch(e){}
+// ── LOAD/SAVE ──
+function loadState() {
+  try {
+    orders = JSON.parse(localStorage.getItem('scanner_orders') || "[]");
+    statChecked = parseInt(localStorage.getItem('checked') || "0");
+    statFound = parseInt(localStorage.getItem('found') || "0");
+  } catch {}
 }
 
-// сохранение
-function saveState(){
-  localStorage.setItem("orders", JSON.stringify(orders.slice(0,50)));
-  localStorage.setItem("stats", JSON.stringify({
-    checked: statChecked,
-    found: statFound
-  }));
+function saveState() {
+  localStorage.setItem('scanner_orders', JSON.stringify(orders.slice(0,50)));
+  localStorage.setItem('checked', statChecked);
+  localStorage.setItem('found', statFound);
 }
 
-// добавление ордера
-function addOrder(o){
-  if(!o) return;
+// ── РЕНДЕР ──
+function renderOrders() {
+  const list = document.getElementById('ordersList');
 
-  // защита от дублей
-  if(orders.find(x => x.link === o.link)) return;
+  if (!orders.length) {
+    list.innerHTML = '<div class="orders-empty">Ордера появятся здесь</div>';
+    return;
+  }
+
+  list.innerHTML = orders.map(o => `
+    <div class="order-entry">
+      <div class="order-top">
+        <div class="order-nick">👤 ${o.nick}</div>
+        <div class="order-time">${o.time}</div>
+      </div>
+      <div class="order-row">
+        <span class="order-badge badge-amber">💰 ${o.price}</span>
+        <span class="order-badge badge-blue">📊 ${o.min}–${o.max}</span>
+      </div>
+      <div class="order-remark">${o.remark || ''}</div>
+      <a class="order-link" href="${o.link}" target="_blank">Открыть</a>
+    </div>
+  `).join('');
+
+  document.getElementById('statFound').innerText = statFound;
+  document.getElementById('statChecked').innerText = statChecked;
+}
+
+// ── ДОБАВЛЕНИЕ ОРДЕРА ──
+function addOrder(o) {
+  // ❗ анти-дубль
+  if (orders.find(x => x.id === o.id)) return;
 
   orders.unshift(o);
 
-  if(orders.length > 50) orders.pop();
+  if (orders.length > 50) orders.pop();
 
   statFound++;
+
   saveState();
-  render();
+  renderOrders();
 }
 
-// рендер
-function render(){
-  const list = document.getElementById("ordersList");
+// ── ПРИЕМ ДАННЫХ ОТ БОТА ──
+window.addEventListener("message", (e) => {
+  try {
+    const data = JSON.parse(e.data);
 
-  if(!orders.length){
-    list.innerHTML = '<div class="orders-empty">Ордера появятся здесь</div>';
-  } else {
-    list.innerHTML = orders.map(o => `
-      <div class="order-entry">
-        👤 ${o.nick}<br>
-        💰 ${o.price}<br>
-        📊 ${o.min}-${o.max}<br>
-        <a class="order-link" href="${o.link}" target="_blank">🔗 Открыть</a>
-      </div>
-    `).join("");
-  }
+    if (data.type === "order") {
+      addOrder(data.order);
+    }
 
-  document.getElementById("statChecked").textContent = statChecked;
-  document.getElementById("statFound").textContent = statFound;
+    if (data.type === "stats") {
+      statChecked = data.checked;
+      document.getElementById('statChecked').innerText = statChecked;
+      saveState();
+    }
 
-  const btn = document.getElementById("mainBtn");
+  } catch {}
+});
 
-  if(state.running){
-    btn.className = "stop";
-    btn.innerText = "⛔ Остановить";
-  } else {
-    btn.className = "start";
-    btn.innerText = "▶ Запустить";
-  }
-}
+// ── КНОПКА ──
+function toggleScanner() {
+  const amt = document.getElementById('amountInput').value;
 
-// кнопка старт/стоп
-function toggleScanner(){
   state.running = !state.running;
-  state.amount = document.getElementById("amountInput").value;
 
-  sendToBot();
-  render();
+  tg.sendData(JSON.stringify({
+    running: state.running,
+    amount: amt
+  }));
 }
 
-// отправка в бота
-function sendToBot(){
-  if(tg){
-    tg.sendData(JSON.stringify({
-      running: state.running,
-      amount: state.amount
-    }));
-  }
-}
-
-// получение данных от бота
-function syncFromURL(){
-  try{
-    const params = new URLSearchParams(window.location.search);
-
-    if(params.get("checked")){
-      statChecked = parseInt(params.get("checked")) || statChecked;
-    }
-
-    if(params.get("found")){
-      statFound = parseInt(params.get("found")) || statFound;
-    }
-
-    const orderParam = params.get("order");
-
-    if(orderParam){
-      const order = JSON.parse(decodeURIComponent(orderParam));
-
-      addOrder(order);
-
-      // убираем из URL чтобы не дублировалось
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-
-  }catch(e){
-    console.log("Ошибка:", e);
-  }
-}
-
-// INIT
+// ── INIT ──
 loadState();
-syncFromURL();
-render();
+renderOrders();
 </script>
-
 </body>
 </html>
