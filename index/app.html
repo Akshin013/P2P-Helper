@@ -2,430 +2,183 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Bybit P2P Scanner</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>P2P Scanner</title>
+
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  :root {
-    --bg: #0f0f13; --bg2: #1a1a22; --bg3: #22222e;
-    --accent: #f7a600; --accent2: #ff6b35;
-    --green: #00d68f; --red: #ff4757;
-    --text: #ffffff; --text2: #9999bb; --text3: #555577;
-    --border: rgba(255,255,255,0.07); --radius: 16px; --radius-sm: 10px;
-  }
-  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif; min-height: 100vh; padding: 0 0 90px; overflow-x: hidden; }
+body {
+  background: #0f0f13;
+  color: #fff;
+  font-family: Arial;
+  margin: 0;
+  padding: 20px;
+}
 
-  .header { padding: 20px 20px 0; display: flex; align-items: center; justify-content: space-between; }
-  .logo { display: flex; align-items: center; gap: 10px; }
-  .logo-icon { width: 38px; height: 38px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
-  .logo-text { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
-  .logo-sub { font-size: 11px; color: var(--text2); margin-top: 1px; }
-  .status-pill { display: flex; align-items: center; gap: 6px; background: var(--bg2); border: 1px solid var(--border); border-radius: 20px; padding: 5px 12px; font-size: 12px; color: var(--text2); }
-  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text3); transition: all 0.3s; }
-  .status-dot.active { background: var(--green); box-shadow: 0 0 8px rgba(0,214,143,0.6); animation: pulse 2s infinite; }
-  @keyframes pulse { 0%,100%{box-shadow:0 0 8px rgba(0,214,143,0.6)} 50%{box-shadow:0 0 16px rgba(0,214,143,0.4)} }
+button {
+  padding: 15px;
+  width: 100%;
+  margin-top: 10px;
+  border-radius: 10px;
+  border: none;
+  font-weight: bold;
+}
 
-  .section { padding: 16px 20px 0; }
-  .section-label { font-size: 11px; font-weight: 600; letter-spacing: 1.2px; color: var(--text3); text-transform: uppercase; margin-bottom: 10px; }
+.start { background: #00d68f; }
+.stop { background: #ff4757; }
 
-  .main-btn { width: 100%; height: 56px; border-radius: var(--radius); border: none; font-size: 16px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.2s; position: relative; overflow: hidden; }
-  .main-btn::after { content: ''; position: absolute; inset: 0; background: rgba(255,255,255,0); transition: background 0.15s; }
-  .main-btn:active::after { background: rgba(255,255,255,0.1); }
-  .main-btn.start { background: linear-gradient(135deg, #00d68f, #00b87a); color: #003d28; }
-  .main-btn.stop { background: linear-gradient(135deg, #ff4757, #e03040); color: #fff; }
+.card {
+  background: #1a1a22;
+  padding: 15px;
+  border-radius: 12px;
+  margin-top: 15px;
+}
 
-  .card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.order {
+  background: #22222e;
+  padding: 10px;
+  margin-top: 10px;
+  border-radius: 10px;
+}
 
-  .input-row { display: flex; align-items: center; padding: 14px 16px; gap: 12px; }
-  .input-icon { width: 36px; height: 36px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
-  .icon-gold { background: rgba(247,166,0,0.15); }
-  .icon-blue { background: rgba(55,138,221,0.15); }
-  .icon-red  { background: rgba(255,71,87,0.15); }
-  .icon-purple { background: rgba(120,80,255,0.15); }
-  .input-info { flex: 1; min-width: 0; }
-  .input-label { font-size: 11px; color: var(--text2); margin-bottom: 3px; }
-  .styled-input { background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 17px; font-weight: 700; padding: 6px 10px; width: 100%; outline: none; }
-  .styled-input:focus { border-color: rgba(247,166,0,0.4); }
-  .divider { height: 1px; background: var(--border); margin: 0 16px; }
-
-  .toggle-row { display: flex; align-items: center; padding: 14px 16px; gap: 12px; cursor: pointer; transition: background 0.15s; border-bottom: 1px solid var(--border); }
-  .toggle-row:last-child { border-bottom: none; }
-  .toggle-row:active { background: rgba(255,255,255,0.04); }
-  .toggle-text { flex: 1; }
-  .toggle-title { font-size: 15px; font-weight: 500; }
-  .toggle-desc { font-size: 12px; color: var(--text2); margin-top: 2px; }
-  .switch { width: 44px; height: 26px; background: var(--bg3); border-radius: 13px; position: relative; transition: background 0.25s; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.08); }
-  .switch.on { background: var(--green); border-color: transparent; }
-  .switch::after { content: ''; position: absolute; width: 20px; height: 20px; background: #fff; border-radius: 50%; top: 2px; left: 2px; transition: transform 0.25s cubic-bezier(.4,0,.2,1); box-shadow: 0 1px 4px rgba(0,0,0,0.3); }
-  .switch.on::after { transform: translateX(18px); }
-
-  .mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .mode-btn { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px; cursor: pointer; text-align: center; transition: all 0.2s; }
-  .mode-btn.active { background: rgba(247,166,0,0.1); border-color: rgba(247,166,0,0.4); }
-  .mode-btn-icon { font-size: 20px; margin-bottom: 5px; }
-  .mode-btn-title { font-size: 13px; font-weight: 600; color: var(--text); }
-  .mode-btn-desc { font-size: 11px; color: var(--text2); margin-top: 2px; }
-  .mode-btn.active .mode-btn-title { color: var(--accent); }
-
-  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .stat-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px; }
-  .stat-label { font-size: 11px; color: var(--text2); margin-bottom: 6px; }
-  .stat-value { font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }
-  .stat-value.green { color: var(--green); }
-  .stat-value.amber { color: var(--accent); }
-
-  /* ОРДЕРА */
-  .orders-wrap { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
-  .orders-header { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
-  .orders-title { font-size: 13px; font-weight: 600; color: var(--text2); }
-  .orders-clear { font-size: 12px; color: var(--text3); cursor: pointer; }
-  .orders-clear:active { color: var(--red); }
-  .order-entry { padding: 12px 16px; border-bottom: 1px solid var(--border); animation: slideIn 0.25s ease; }
-  .order-entry:last-child { border-bottom: none; }
-  @keyframes slideIn { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
-  .order-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
-  .order-nick { font-size: 14px; font-weight: 600; color: var(--text); }
-  .order-time { font-size: 11px; color: var(--text3); }
-  .order-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
-  .order-badge { font-size: 11px; padding: 3px 8px; border-radius: 6px; font-weight: 500; }
-  .badge-green { background: rgba(0,214,143,0.12); color: var(--green); }
-  .badge-amber { background: rgba(247,166,0,0.12); color: var(--accent); }
-  .badge-blue  { background: rgba(55,138,221,0.12); color: #5aafff; }
-  .order-remark { font-size: 12px; color: var(--text2); margin-top: 4px; line-height: 1.4; }
-  .order-link { display: inline-block; margin-top: 6px; font-size: 12px; color: var(--accent); text-decoration: none; }
-  .orders-empty { padding: 30px; text-align: center; color: var(--text3); font-size: 13px; }
-
-  .save-btn { position: fixed; bottom: 0; left: 0; right: 0; padding: 12px 20px; background: var(--bg); border-top: 1px solid var(--border); }
-  .save-btn button { width: 100%; height: 52px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border: none; border-radius: var(--radius-sm); color: #1a0a00; font-size: 16px; font-weight: 700; cursor: pointer; transition: opacity 0.15s; }
-  .save-btn button:active { opacity: 0.85; }
-
-  .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-80px); background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 10px 20px; border-radius: 30px; font-size: 14px; font-weight: 500; transition: transform 0.3s cubic-bezier(.4,0,.2,1); z-index: 999; white-space: nowrap; }
-  .toast.show { transform: translateX(-50%) translateY(0); }
-  .gap { height: 12px; }
+a {
+  color: orange;
+}
 </style>
 </head>
+
 <body>
 
-<div class="header">
-  <div class="logo">
-    <div class="logo-icon">⚡</div>
-    <div>
-      <div class="logo-text">P2P Scanner</div>
-      <div class="logo-sub">Bybit · USDT/RUB</div>
-    </div>
-  </div>
-  <div class="status-pill">
-    <div class="status-dot" id="statusDot"></div>
-    <span id="statusText">Остановлен</span>
-  </div>
+<h2>⚡ P2P Scanner</h2>
+
+<button id="mainBtn" class="start" onclick="toggleScanner()">▶ Запустить</button>
+
+<div class="card">
+  <p>💰 Сумма:</p>
+  <input id="amount" type="number" value="3000" style="width:100%;padding:10px;">
 </div>
 
-<div class="section" style="margin-top:16px;">
-  <button class="main-btn start" id="mainBtn" onclick="toggleScanner()">
-    <span id="mainBtnIcon">▶</span>
-    <span id="mainBtnText">Запустить сканер</span>
-  </button>
+<div class="card">
+  <p>📊 Проверено: <span id="checked">0</span></p>
+  <p>🔥 Найдено: <span id="found">0</span></p>
 </div>
 
-<div class="section">
-  <div class="section-label">Параметры поиска</div>
-  <div class="card">
-    <div class="input-row">
-      <div class="input-icon icon-gold">💰</div>
-      <div class="input-info">
-        <div class="input-label">Сумма в описании ордера (RUB)</div>
-        <input class="styled-input" type="number" id="amountInput" placeholder="2500" inputmode="numeric">
-      </div>
-    </div>
-    <div class="divider"></div>
-    <div class="input-row">
-      <div class="input-icon icon-blue">📉</div>
-      <div class="input-info">
-        <div class="input-label">Максимальный курс (руб за USDT)</div>
-        <input class="styled-input" type="number" id="maxPriceInput" placeholder="82" inputmode="numeric">
-      </div>
-    </div>
-  </div>
+<div class="card">
+  <h3>Ордера</h3>
+  <div id="orders"></div>
 </div>
-
-<div class="section">
-  <div class="section-label">Режим поиска</div>
-  <div class="mode-grid">
-    <div class="mode-btn active" id="modeExact" onclick="setMode('exact')">
-      <div class="mode-btn-icon">🎯</div>
-      <div class="mode-btn-title">Точная сумма</div>
-      <div class="mode-btn-desc">Именно эту цифру</div>
-    </div>
-    <div class="mode-btn" id="modeMax" onclick="setMode('max')">
-      <div class="mode-btn-icon">📊</div>
-      <div class="mode-btn-title">До максимума</div>
-      <div class="mode-btn-desc">Любая сумма ≤ этой</div>
-    </div>
-  </div>
-</div>
-
-<div class="section">
-  <div class="section-label">Фильтры</div>
-  <div class="card">
-    <div class="toggle-row" onclick="toggle('blacklist')">
-      <div class="input-icon icon-red">🏦</div>
-      <div class="toggle-text">
-        <div class="toggle-title">Блок Т-банка</div>
-        <div class="toggle-desc">Скрывать ордера с Тинькофф</div>
-      </div>
-      <div class="switch on" id="sw-blacklist"></div>
-    </div>
-    <div class="toggle-row" onclick="toggle('priceFilter')">
-      <div class="input-icon icon-blue">📉</div>
-      <div class="toggle-text">
-        <div class="toggle-title">Фильтр по курсу</div>
-        <div class="toggle-desc" id="priceDesc">Скрывать дороже макс. курса</div>
-      </div>
-      <div class="switch" id="sw-priceFilter"></div>
-    </div>
-  </div>
-</div>
-
-<div class="section">
-  <div class="section-label">Статистика сессии</div>
-  <div class="stats-grid">
-    <div class="stat-card">
-      <div class="stat-label">Проверено</div>
-      <div class="stat-value amber" id="statChecked">0</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Найдено</div>
-      <div class="stat-value green" id="statFound">0</div>
-    </div>
-  </div>
-</div>
-
-<div class="section">
-  <div class="section-label">Найденные ордера</div>
-  <div class="orders-wrap">
-    <div class="orders-header">
-      <div class="orders-title">Результаты поиска</div>
-      <div class="orders-clear" onclick="clearOrders()">Очистить</div>
-    </div>
-    <div id="ordersList">
-      <div class="orders-empty">Ордера появятся здесь во время сканирования</div>
-    </div>
-  </div>
-</div>
-
-<div class="gap"></div>
-
-<div class="save-btn">
-  <button onclick="saveSettings()">💾 Сохранить настройки</button>
-</div>
-
-<div class="toast" id="toast"></div>
 
 <script>
-const tg = window.Telegram?.WebApp;
-if (tg) { tg.expand(); tg.setHeaderColor('#0f0f13'); tg.setBackgroundColor('#0f0f13'); }
+const tg = window.Telegram.WebApp;
+tg.expand();
 
-// ── Состояние ──
-let state = { running: false, mode: 'exact', blacklist: true, priceFilter: false, amount: '2500', maxPrice: '82' };
+let state = {
+  running: false,
+  amount: "3000"
+};
+
 let orders = [];
-let statChecked = 0, statFound = 0;
+let checked = 0;
+let found = 0;
 
-// ── Загрузка сохранённых данных ──
-function loadState() {
-  try {
-    const saved = localStorage.getItem('scanner_state');
-    if (saved) { const s = JSON.parse(saved); Object.assign(state, s); }
-    const savedOrders = localStorage.getItem('scanner_orders');
-    if (savedOrders) orders = JSON.parse(savedOrders);
-    const savedStats = localStorage.getItem('scanner_stats');
-    if (savedStats) { const s = JSON.parse(savedStats); statChecked = s.checked||0; statFound = s.found||0; }
-  } catch(e) {}
-}
+function render() {
+  document.getElementById("checked").innerText = checked;
+  document.getElementById("found").innerText = found;
 
-function saveState() {
-  try {
-    localStorage.setItem('scanner_state', JSON.stringify(state));
-    localStorage.setItem('scanner_orders', JSON.stringify(orders.slice(0,50)));
-    localStorage.setItem('scanner_stats', JSON.stringify({checked: statChecked, found: statFound}));
-  } catch(e) {}
-}
+  const btn = document.getElementById("mainBtn");
 
-// ── Синхронизация из бота через URL параметры ──
-function syncFromURL() {
-  try {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('running')) state.running = params.get('running') === 'true';
-    if (params.get('amount')) state.amount = params.get('amount');
-    if (params.get('mode')) state.mode = params.get('mode');
-    if (params.get('blacklist')) state.blacklist = params.get('blacklist') === 'true';
-    if (params.get('priceFilter')) state.priceFilter = params.get('priceFilter') === 'true';
-    if (params.get('maxPrice')) state.maxPrice = params.get('maxPrice');
-    if (params.get('checked')) statChecked = parseInt(params.get('checked'))||0;
-    if (params.get('found')) statFound = parseInt(params.get('found'))||0;
-
-    // Новые ордера из бота
-    const newOrder = params.get('order');
-    if (newOrder) {
-      const o = JSON.parse(decodeURIComponent(newOrder));
-      addOrder(o);
-      statFound++;
-    }
-  } catch(e) {}
-}
-
-// ── Рендер ──
-function renderAll() {
-  document.getElementById('amountInput').value = state.amount;
-  document.getElementById('maxPriceInput').value = state.maxPrice;
-  document.getElementById('sw-blacklist').classList.toggle('on', state.blacklist);
-  document.getElementById('sw-priceFilter').classList.toggle('on', state.priceFilter);
-  document.getElementById('modeExact').classList.toggle('active', state.mode === 'exact');
-  document.getElementById('modeMax').classList.toggle('active', state.mode === 'max');
-  document.getElementById('statChecked').textContent = statChecked;
-  document.getElementById('statFound').textContent = statFound;
-
-  const btn = document.getElementById('mainBtn');
-  const dot = document.getElementById('statusDot');
-  const statusTxt = document.getElementById('statusText');
   if (state.running) {
-    btn.className = 'main-btn stop';
-    document.getElementById('mainBtnIcon').textContent = '⏹';
-    document.getElementById('mainBtnText').textContent = 'Остановить сканер';
-    dot.classList.add('active');
-    statusTxt.textContent = 'Работает';
+    btn.className = "stop";
+    btn.innerText = "⛔ Остановить";
   } else {
-    btn.className = 'main-btn start';
-    document.getElementById('mainBtnIcon').textContent = '▶';
-    document.getElementById('mainBtnText').textContent = 'Запустить сканер';
-    dot.classList.remove('active');
-    statusTxt.textContent = 'Остановлен';
+    btn.className = "start";
+    btn.innerText = "▶ Запустить";
   }
 
   renderOrders();
 }
 
 function renderOrders() {
-  const list = document.getElementById('ordersList');
+  const el = document.getElementById("orders");
+
   if (!orders.length) {
-    list.innerHTML = '<div class="orders-empty">Ордера появятся здесь во время сканирования</div>';
+    el.innerHTML = "Нет ордеров";
     return;
   }
-  list.innerHTML = orders.map(o => `
-    <div class="order-entry">
-      <div class="order-top">
-        <div class="order-nick">👤 ${o.nick}</div>
-        <div class="order-time">${o.time}</div>
-      </div>
-      <div class="order-row">
-        <span class="order-badge badge-amber">💰 ${o.price} RUB/USDT</span>
-        <span class="order-badge badge-blue">📊 ${o.min}–${o.max} RUB</span>
-      </div>
-      <div class="order-remark">📝 ${o.remark || '—'}</div>
-      <a class="order-link" href="${o.link}" target="_blank">🔗 Открыть на Bybit →</a>
+
+  el.innerHTML = orders.map(o => `
+    <div class="order">
+      👤 ${o.nick}<br>
+      💰 ${o.price}<br>
+      📊 ${o.min}-${o.max}<br>
+      <a href="${o.link}" target="_blank">Открыть</a>
     </div>
-  `).join('');
+  `).join("");
 }
 
 function addOrder(o) {
+  if (!o) return;
+
   orders.unshift(o);
-  if (orders.length > 50) orders.pop();
-  renderOrders();
-  saveState();
-}
 
-function clearOrders() {
-  orders = [];
-  statChecked = 0;
-  statFound = 0;
-  saveState();
-  renderAll();
-  showToast('Очищено');
-}
+  if (orders.length > 50) {
+    orders.pop();
+  }
 
-// ── Действия ──
-function setMode(m) {
-  state.mode = m;
-  document.getElementById('modeExact').classList.toggle('active', m === 'exact');
-  document.getElementById('modeMax').classList.toggle('active', m === 'max');
-  if (tg) tg.HapticFeedback.impactOccurred('light');
-}
-
-function toggle(key) {
-  state[key] = !state[key];
-  document.getElementById('sw-' + key).classList.toggle('on', state[key]);
-  if (tg) tg.HapticFeedback.impactOccurred('light');
+  found++;
+  render();
 }
 
 function toggleScanner() {
-  const amt = document.getElementById('amountInput').value.trim();
-  if (!amt || isNaN(amt)) { showToast('⚠️ Введи сумму для поиска'); return; }
-  state.amount = amt;
-  state.maxPrice = document.getElementById('maxPriceInput').value.trim() || '82';
   state.running = !state.running;
-  saveState();
-  renderAll();
-  sendToBot();
-  if (tg) tg.HapticFeedback.notificationOccurred(state.running ? 'success' : 'warning');
-}
+  state.amount = document.getElementById("amount").value;
 
-function saveSettings() {
-  const amt = document.getElementById('amountInput').value.trim();
-  if (!amt || isNaN(amt)) { showToast('⚠️ Введи сумму'); return; }
-  state.amount = amt;
-  state.maxPrice = document.getElementById('maxPriceInput').value.trim() || '82';
-  saveState();
   sendToBot();
-  showToast('✅ Сохранено');
-  if (tg) {
-    tg.HapticFeedback.notificationOccurred('success');
-    setTimeout(() => tg.close(), 700);
-  }
+  render();
 }
 
 function sendToBot() {
-  if (tg) {
-    tg.sendData(JSON.stringify({
-      running: state.running,
-      mode: state.mode,
-      amount: state.amount,
-      maxPrice: state.maxPrice,
-      blacklist: state.blacklist,
-      priceFilter: state.priceFilter
-    }));
+  tg.sendData(JSON.stringify({
+    running: state.running,
+    amount: state.amount
+  }));
+}
+
+function syncFromURL() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+
+    if (params.get("checked")) {
+      checked = parseInt(params.get("checked"));
+    }
+
+    if (params.get("found")) {
+      found = parseInt(params.get("found"));
+    }
+
+    const orderParam = params.get("order");
+
+    if (orderParam) {
+      const decoded = decodeURIComponent(orderParam);
+      const order = JSON.parse(decoded);
+
+      addOrder(order);
+
+      // удаляем из URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+  } catch (e) {
+    console.log("Ошибка:", e);
   }
 }
 
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2500);
-}
-
-// ── Слушаем новые ордера от бота через postMessage ──
-window.addEventListener('message', (e) => {
-  try {
-    const data = JSON.parse(e.data);
-    if (data.type === 'new_order') {
-      addOrder(data.order);
-      statFound++;
-      document.getElementById('statFound').textContent = statFound;
-      saveState();
-      if (tg) tg.HapticFeedback.notificationOccurred('success');
-    }
-    if (data.type === 'stats') {
-      statChecked = data.checked;
-      document.getElementById('statChecked').textContent = statChecked;
-      saveState();
-    }
-  } catch(e) {}
-});
-
-// ── Инициализация ──
-loadState();
+// INIT
 syncFromURL();
-renderAll();
+render();
+
 </script>
+
 </body>
 </html>
