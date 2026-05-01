@@ -218,166 +218,96 @@
 
 <script>
 const tg = window.Telegram?.WebApp;
-if(tg){tg.expand();tg.setHeaderColor('#0f0f13');tg.setBackgroundColor('#0f0f13')}
+if(tg){
+  tg.expand();
+  tg.setHeaderColor('#0f0f13');
+  tg.setBackgroundColor('#0f0f13');
 
-// ── Состояние — все ключи объявлены сразу ──
+  // ❗ ВАЖНО: запрещаем самозакрытие
+  tg.enableClosingConfirmation();
+}
+
 let S = {
-  running: false,
-  mode: 'exact',
-  blacklist: true,
-  priceFilter: false,
-  firstPerson: false,   // ← FIX: был не объявлен
-  amount: '2500',
-  maxPrice: '82'
+  running:false,
+  mode:'exact',
+  blacklist:true,
+  priceFilter:false,
+  firstPerson:false,
+  amount:'2500',
+  maxPrice:'82'
 };
-let orders = [];
-let checked = 0, found = 0;
 
-// ── localStorage ──
-function load(){
-  try{
-    const s = localStorage.getItem('s');
-    if(s) Object.assign(S, JSON.parse(s));
-    const o = localStorage.getItem('o');
-    if(o) orders = JSON.parse(o);
-    const st = localStorage.getItem('st');
-    if(st){ const d=JSON.parse(st); checked=d.c||0; found=d.f||0; }
-  }catch(e){}
-}
+let orders=[];
+let checked=0, found=0;
 
-function persist(){
-  try{
-    localStorage.setItem('s', JSON.stringify(S));
-    localStorage.setItem('o', JSON.stringify(orders.slice(0,50)));
-    localStorage.setItem('st', JSON.stringify({c:checked, f:found}));
-  }catch(e){}
-}
 
-// ── Ордер из URL (кнопка "В панель" из бота) ──
-function checkURL(){
-  try{
-    const p = new URLSearchParams(window.location.search);
-    const raw = p.get('order');
-    if(raw){
-      const o = JSON.parse(decodeURIComponent(raw));
-      // FIX: бот не кладёт поле type — просто проверяем наличие nick
-      if(o && o.nick) pushOrder(o);
-    }
-  }catch(e){}
-}
-
-// ── Рендер ──
-function render(){
-  document.getElementById('amtInput').value = S.amount;
-  document.getElementById('priceInput').value = S.maxPrice;
-  // FIX: рендерим все три переключателя включая firstPerson
-  ['blacklist','priceFilter','firstPerson'].forEach(k => {
-    document.getElementById('sw-'+k).classList.toggle('on', S[k]);
-  });
-  document.getElementById('mExact').classList.toggle('active', S.mode==='exact');
-  document.getElementById('mMax').classList.toggle('active', S.mode==='max');
-  document.getElementById('stChecked').textContent = checked;
-  document.getElementById('stFound').textContent = found;
-
-  const on = S.running;
-  document.getElementById('mainBtn').className = 'main-btn '+(on?'stop':'start');
-  document.getElementById('btnIcon').textContent = on ? '⏹' : '▶';
-  document.getElementById('btnTxt').textContent = on ? 'Остановить' : 'Запустить сканер';
-  document.getElementById('sdot').classList.toggle('on', on);
-  document.getElementById('stxt').textContent = on ? 'Работает' : 'Остановлен';
-
-  renderOrders();
-}
-
-function renderOrders(){
-  const el = document.getElementById('olist');
-  if(!orders.length){ el.innerHTML='<div class="oempty">Ордера появятся здесь</div>'; return; }
-  el.innerHTML = orders.map((o,i) => `
-    <div class="oentry${i===0?' onew':''}">
-      <div class="otop">
-        <div class="onick">👤 ${o.nick}</div>
-        <div class="otime">${o.time||''}</div>
-      </div>
-      <div class="obadges">
-        <span class="badge ba">💰 ${o.price} RUB/USDT</span>
-        <span class="badge bb">📊 ${o.min}–${o.max} RUB</span>
-      </div>
-      <div class="oremark">📝 ${o.remark||'—'}</div>
-      <a class="olink" href="${o.link}" target="_blank">🔗 Открыть на Bybit →</a>
-    </div>
-  `).join('');
-}
-
-function pushOrder(o){
-  if(orders.find(x => x.link === o.link)) return; // не дублируем
-  orders.unshift(o);
-  if(orders.length>50) orders.pop();
-  found++;
-  document.getElementById('stFound').textContent = found;
-  renderOrders();
-  persist();
-  if(tg) tg.HapticFeedback.notificationOccurred('success');
-}
-
-function clearOrders(){
-  orders=[]; checked=0; found=0;
-  persist(); render(); showToast('Очищено');
-}
-
-// ── Действия ──
-function setMode(m){
-  S.mode=m;
-  document.getElementById('mExact').classList.toggle('active', m==='exact');
-  document.getElementById('mMax').classList.toggle('active', m==='max');
-  if(tg) tg.HapticFeedback.impactOccurred('light');
-}
-
-function tog(k){
-  S[k]=!S[k];
-  document.getElementById('sw-'+k).classList.toggle('on', S[k]);
-  if(tg) tg.HapticFeedback.impactOccurred('light');
-}
-
-function toggleScanner(){
-  const amt = document.getElementById('amtInput').value.trim();
-  if(!amt||isNaN(amt)){ showToast('⚠️ Введи сумму'); return; }
-  S.amount = amt;
-  S.maxPrice = document.getElementById('priceInput').value.trim()||'82';
-  S.running = !S.running;
-  if(S.running){ checked=0; found=0; }
-  persist(); render(); send();
-  if(tg) tg.HapticFeedback.notificationOccurred(S.running?'success':'warning');
-}
-
-function save(){
-  const amt = document.getElementById('amtInput').value.trim();
-  if(!amt||isNaN(amt)){ showToast('⚠️ Введи сумму'); return; }
-  S.amount = amt;
-  S.maxPrice = document.getElementById('priceInput').value.trim()||'82';
-  persist(); send(); showToast('✅ Сохранено');
-  if(tg){ tg.HapticFeedback.notificationOccurred('success'); setTimeout(()=>tg.close(),700); }
-}
-
-// FIX: firstPerson теперь включён в send()
+// ───── отправка в бот ─────
 function send(){
-  if(tg) tg.sendData(JSON.stringify({
-    running:     S.running,
-    mode:        S.mode,
-    amount:      S.amount,
-    maxPrice:    S.maxPrice,
-    blacklist:   S.blacklist,
-    priceFilter: S.priceFilter,
-    firstPerson: S.firstPerson   // ← FIX: раньше не отправлялся
+  if(!tg) return;
+
+  tg.sendData(JSON.stringify({
+    running:S.running,
+    mode:S.mode,
+    amount:S.amount,
+    maxPrice:S.maxPrice,
+    blacklist:S.blacklist,
+    priceFilter:S.priceFilter,
+    firstPerson:S.firstPerson
   }));
 }
 
-function showToast(msg){
-  const t=document.getElementById('toast');
-  t.textContent=msg; t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'),2500);
+
+// ───── toggle ─────
+function tog(k){
+  S[k]=!S[k];
+  document.getElementById('sw-'+k).classList.toggle('on', S[k]);
 }
 
-load(); checkURL(); render();
+
+// ───── режим ─────
+function setMode(m){
+  S.mode=m;
+  document.getElementById('mExact').classList.toggle('active',m==='exact');
+  document.getElementById('mMax').classList.toggle('active',m==='max');
+}
+
+
+// ───── старт/стоп ─────
+function toggleScanner(){
+  const amt=document.getElementById('amtInput').value;
+
+  if(!amt){
+    alert("введи сумму");
+    return;
+  }
+
+  S.amount=amt;
+  S.maxPrice=document.getElementById('priceInput').value||'82';
+  S.running=!S.running;
+
+  send();
+  render();
+}
+
+
+// ───── сохранение (НЕ закрываем приложение!) ─────
+function save(){
+  send();
+  alert("сохранено");
+}
+
+
+// ───── render ─────
+function render(){
+  document.getElementById('sw-blacklist').classList.toggle('on',S.blacklist);
+  document.getElementById('sw-priceFilter').classList.toggle('on',S.priceFilter);
+  document.getElementById('sw-firstPerson').classList.toggle('on',S.firstPerson);
+
+  document.getElementById('mExact').classList.toggle('active',S.mode==='exact');
+  document.getElementById('mMax').classList.toggle('active',S.mode==='max');
+}
+
+render();
 </script>
 </body>
 </html>
