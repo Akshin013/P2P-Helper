@@ -1,184 +1,140 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>P2P Scanner</title>
-
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
-
-<style>
-body {
-  background: #0f0f13;
-  color: #fff;
-  font-family: Arial;
-  margin: 0;
-  padding: 20px;
-}
-
-button {
-  padding: 15px;
-  width: 100%;
-  margin-top: 10px;
-  border-radius: 10px;
-  border: none;
-  font-weight: bold;
-}
-
-.start { background: #00d68f; }
-.stop { background: #ff4757; }
-
-.card {
-  background: #1a1a22;
-  padding: 15px;
-  border-radius: 12px;
-  margin-top: 15px;
-}
-
-.order {
-  background: #22222e;
-  padding: 10px;
-  margin-top: 10px;
-  border-radius: 10px;
-}
-
-a {
-  color: orange;
-}
-</style>
-</head>
-
-<body>
-
-<h2>⚡ P2P Scanner</h2>
-
-<button id="mainBtn" class="start" onclick="toggleScanner()">▶ Запустить</button>
-
-<div class="card">
-  <p>💰 Сумма:</p>
-  <input id="amount" type="number" value="3000" style="width:100%;padding:10px;">
-</div>
-
-<div class="card">
-  <p>📊 Проверено: <span id="checked">0</span></p>
-  <p>🔥 Найдено: <span id="found">0</span></p>
-</div>
-
-<div class="card">
-  <h3>Ордера</h3>
-  <div id="orders"></div>
-</div>
-
 <script>
-const tg = window.Telegram.WebApp;
-tg.expand();
+const tg = window.Telegram?.WebApp;
+if (tg) tg.expand();
 
+// состояние
 let state = {
   running: false,
-  amount: "3000"
+  amount: "2500"
 };
 
 let orders = [];
-let checked = 0;
-let found = 0;
+let statChecked = 0;
+let statFound = 0;
 
-function render() {
-  document.getElementById("checked").innerText = checked;
-  document.getElementById("found").innerText = found;
+// загрузка
+function loadState() {
+  try {
+    const o = localStorage.getItem("orders");
+    if (o) orders = JSON.parse(o);
 
-  const btn = document.getElementById("mainBtn");
-
-  if (state.running) {
-    btn.className = "stop";
-    btn.innerText = "⛔ Остановить";
-  } else {
-    btn.className = "start";
-    btn.innerText = "▶ Запустить";
-  }
-
-  renderOrders();
+    const s = localStorage.getItem("stats");
+    if (s) {
+      const parsed = JSON.parse(s);
+      statChecked = parsed.checked || 0;
+      statFound = parsed.found || 0;
+    }
+  } catch {}
 }
 
+// сохранение
+function saveState() {
+  localStorage.setItem("orders", JSON.stringify(orders.slice(0, 50)));
+  localStorage.setItem("stats", JSON.stringify({
+    checked: statChecked,
+    found: statFound
+  }));
+}
+
+// добавление ордера
+function addOrder(o) {
+  if (!o) return;
+
+  // ❌ защита от дублей
+  const exists = orders.some(x => x.link === o.link);
+  if (exists) return;
+
+  orders.unshift(o);
+
+  if (orders.length > 50) orders.pop();
+
+  statFound++;
+  saveState();
+  renderOrders();
+  renderStats();
+}
+
+// рендер ордеров
 function renderOrders() {
-  const el = document.getElementById("orders");
+  const list = document.getElementById("ordersList");
 
   if (!orders.length) {
-    el.innerHTML = "Нет ордеров";
+    list.innerHTML = '<div class="orders-empty">Ордера появятся здесь</div>';
     return;
   }
 
-  el.innerHTML = orders.map(o => `
-    <div class="order">
-      👤 ${o.nick}<br>
-      💰 ${o.price}<br>
-      📊 ${o.min}-${o.max}<br>
-      <a href="${o.link}" target="_blank">Открыть</a>
+  list.innerHTML = orders.map(o => `
+    <div class="order-entry">
+      <div class="order-top">
+        <div class="order-nick">👤 ${o.nick}</div>
+        <div class="order-time">${o.time}</div>
+      </div>
+
+      <div class="order-row">
+        <span class="order-badge badge-amber">💰 ${o.price}</span>
+        <span class="order-badge badge-blue">📊 ${o.min}-${o.max}</span>
+      </div>
+
+      <div class="order-remark">📝 ${o.remark || "—"}</div>
+
+      <a class="order-link" href="${o.link}" target="_blank">
+        🔗 Открыть
+      </a>
     </div>
   `).join("");
 }
 
-function addOrder(o) {
-  if (!o) return;
-
-  orders.unshift(o);
-
-  if (orders.length > 50) {
-    orders.pop();
-  }
-
-  found++;
-  render();
+// статистика
+function renderStats() {
+  document.getElementById("statChecked").textContent = statChecked;
+  document.getElementById("statFound").textContent = statFound;
 }
 
-function toggleScanner() {
-  state.running = !state.running;
-  state.amount = document.getElementById("amount").value;
-
-  sendToBot();
-  render();
-}
-
-function sendToBot() {
-  tg.sendData(JSON.stringify({
-    running: state.running,
-    amount: state.amount
-  }));
-}
-
+// 🔥 ГЛАВНОЕ — получение ордера из бота
 function syncFromURL() {
   try {
     const params = new URLSearchParams(window.location.search);
 
+    // статистика
     if (params.get("checked")) {
-      checked = parseInt(params.get("checked"));
+      statChecked = parseInt(params.get("checked")) || statChecked;
     }
 
     if (params.get("found")) {
-      found = parseInt(params.get("found"));
+      statFound = parseInt(params.get("found")) || statFound;
     }
 
+    // ордер
     const orderParam = params.get("order");
 
     if (orderParam) {
-      const decoded = decodeURIComponent(orderParam);
-      const order = JSON.parse(decoded);
+      const order = JSON.parse(decodeURIComponent(orderParam));
 
       addOrder(order);
 
-      // удаляем из URL
+      // ❗ удаляем чтобы не дублировалось
       window.history.replaceState({}, document.title, window.location.pathname);
     }
 
   } catch (e) {
-    console.log("Ошибка:", e);
+    console.log("sync error", e);
   }
 }
 
+// очистка
+function clearOrders() {
+  orders = [];
+  statChecked = 0;
+  statFound = 0;
+
+  saveState();
+  renderOrders();
+  renderStats();
+}
+
 // INIT
+loadState();
 syncFromURL();
-render();
-
+renderOrders();
+renderStats();
 </script>
-
-</body>
-</html>
